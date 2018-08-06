@@ -8,6 +8,7 @@ Pod::Spec.new do |s|
 
   s.authors            = { "Peter Iakovlev" => '', "Mikhail Komarov" =>  "nemo1369@gmail.com" }
 
+  s.watchos.deployment_target = "2.0"
   s.ios.deployment_target = "8.0"
   s.osx.deployment_target = "10.7"
 
