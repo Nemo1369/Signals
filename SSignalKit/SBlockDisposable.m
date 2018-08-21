@@ -3,8 +3,7 @@
 #import <libkern/OSAtomic.h>
 #import <objc/runtime.h>
 
-@interface SBlockDisposable ()
-{
+@interface SBlockDisposable () {
     void *_block;
 }
 
@@ -12,43 +11,33 @@
 
 @implementation SBlockDisposable
 
-- (instancetype)initWithBlock:(void (^)())block
-{
+- (instancetype)initWithBlock:(void (^)(void))block {
     self = [super init];
-    if (self != nil)
-    {
-        _block = (__bridge_retained void *)[block copy];
+    if (self != nil) {
+        _block = (__bridge_retained void *) [block copy];
     }
     return self;
 }
 
-- (void)dealloc
-{
+- (void)dealloc {
     void *block = _block;
-    if (block != NULL)
-    {
-        if (OSAtomicCompareAndSwapPtr(block, 0, &_block))
-        {
-            if (block != nil)
-            {
-                __strong id strongBlock = (__bridge_transfer id)block;
+    if (block != NULL) {
+        if (OSAtomicCompareAndSwapPtr(block, 0, &_block)) {
+            if (block != nil) {
+                __strong id strongBlock = (__bridge_transfer id) block;
                 strongBlock = nil;
             }
         }
     }
 }
 
-- (void)dispose
-{
+- (void)dispose {
     void *block = _block;
-    if (block != NULL)
-    {
-        if (OSAtomicCompareAndSwapPtr(block, 0, &_block))
-        {
-            if (block != nil)
-            {
-                __strong id strongBlock = (__bridge_transfer id)block;
-                ((dispatch_block_t)strongBlock)();
+    if (block != NULL) {
+        if (OSAtomicCompareAndSwapPtr(block, 0, &_block)) {
+            if (block != nil) {
+                __strong id strongBlock = (__bridge_transfer id) block;
+                ((dispatch_block_t) strongBlock)();
                 strongBlock = nil;
             }
         }

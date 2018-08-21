@@ -7,84 +7,64 @@
 
 @implementation SSignal (Catch)
 
-- (SSignal *)catch:(SSignal *(^)(id error))f
-{
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable> (SSubscriber *subscriber)
-    {
+- (SSignal *)catch:(SSignal *(^)(id error))f {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
         SDisposableSet *disposable = [[SDisposableSet alloc] init];
-        
-        [disposable add:[self startWithNext:^(id next)
-        {
+
+        [disposable add:[self startWithNext:^(id next) {
             [subscriber putNext:next];
-        } error:^(id error)
-        {
+        }                             error:^(id error) {
             SSignal *signal = f(error);
-            [disposable add:[signal startWithNext:^(id next)
-            {
+            [disposable add:[signal startWithNext:^(id next) {
                 [subscriber putNext:next];
-            } error:^(id error)
-            {
+            }                               error:^(id error) {
                 [subscriber putError:error];
-            } completed:^
-            {
+            }                           completed:^{
                 [subscriber putCompletion];
             }]];
-        } completed:^
-        {
+        }                         completed:^{
             [subscriber putCompletion];
         }]];
-        
+
         return disposable;
     }];
 }
 
-static dispatch_block_t recursiveBlock(void (^block)(dispatch_block_t recurse))
-{
-    return ^
-    {
+static dispatch_block_t recursiveBlock(void (^block)(dispatch_block_t recurse)) {
+    return ^{
         block(recursiveBlock(block));
     };
 }
 
-- (SSignal *)restart
-{
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable> (SSubscriber *subscriber)
-    {
+- (SSignal *)restart {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
         SAtomic *shouldRestart = [[SAtomic alloc] initWithValue:@true];
-        
+
         SMetaDisposable *currentDisposable = [[SMetaDisposable alloc] init];
-        
-        void (^start)() = recursiveBlock(^(dispatch_block_t recurse)
-        {
-            NSNumber *currentShouldRestart = [shouldRestart with:^id(NSNumber *current)
-            {
+
+        void (^start)(void) = recursiveBlock(^(dispatch_block_t recurse) {
+            NSNumber *currentShouldRestart = [shouldRestart with:^id(NSNumber *current) {
                 return current;
             }];
-            
-            if ([currentShouldRestart boolValue])
-            {
-                id<SDisposable> disposable = [self startWithNext:^(id next)
-                {
+
+            if (currentShouldRestart.boolValue) {
+                id <SDisposable> disposable = [self startWithNext:^(id next) {
                     [subscriber putNext:next];
-                } error:^(id error)
-                {
+                }                                           error:^(id error) {
                     [subscriber putError:error];
-                } completed:^
-                {
+                }                                       completed:^{
                     recurse();
                 }];
                 [currentDisposable setDisposable:disposable];
             }
         });
-        
+
         start();
-        
-        return [[SBlockDisposable alloc] initWithBlock:^
-        {
+
+        return [[SBlockDisposable alloc] initWithBlock:^{
             [currentDisposable dispose];
-            
-            [shouldRestart modify:^id(__unused id current)
-            {
+
+            [shouldRestart modify:^id(__unused id current) {
                 return @false;
             }];
         }];
@@ -92,35 +72,28 @@ static dispatch_block_t recursiveBlock(void (^block)(dispatch_block_t recurse))
 }
 
 - (SSignal *)retryIf:(bool (^)(id error))predicate {
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable> (SSubscriber *subscriber)
-    {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
         SAtomic *shouldRestart = [[SAtomic alloc] initWithValue:@true];
-        
+
         SMetaDisposable *currentDisposable = [[SMetaDisposable alloc] init];
-        
-        void (^start)() = recursiveBlock(^(dispatch_block_t recurse)
-        {
-            NSNumber *currentShouldRestart = [shouldRestart with:^id(NSNumber *current)
-            {
+
+        void (^start)(void) = recursiveBlock(^(dispatch_block_t recurse) {
+            NSNumber *currentShouldRestart = [shouldRestart with:^id(NSNumber *current) {
                 return current;
             }];
-            
-            if ([currentShouldRestart boolValue])
-            {
-                id<SDisposable> disposable = [self startWithNext:^(id next)
-                {
+
+            if (currentShouldRestart.boolValue) {
+                id <SDisposable> disposable = [self startWithNext:^(id next) {
                     [subscriber putNext:next];
-                } error:^(id error)
-                {
+                }                                           error:^(id error) {
                     if (predicate(error)) {
                         recurse();
                     } else {
                         [subscriber putError:error];
                     }
-                } completed:^
-                {
+                }                                       completed:^{
                     [shouldRestart modify:^id(__unused id current) {
-                         return @false;
+                        return @false;
                     }];
                     [subscriber putCompletion];
                 }];
@@ -129,15 +102,13 @@ static dispatch_block_t recursiveBlock(void (^block)(dispatch_block_t recurse))
                 [subscriber putCompletion];
             }
         });
-        
+
         start();
-        
-        return [[SBlockDisposable alloc] initWithBlock:^
-        {
+
+        return [[SBlockDisposable alloc] initWithBlock:^{
             [currentDisposable dispose];
-            
-            [shouldRestart modify:^id(__unused id current)
-            {
+
+            [shouldRestart modify:^id(__unused id current) {
                 return @false;
             }];
         }];

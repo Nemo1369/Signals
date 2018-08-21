@@ -5,9 +5,11 @@
 
 @interface SThreadPoolQueue : NSObject
 
-- (instancetype)initWithThreadPool:(SThreadPool *)threadPool;
+- (instancetype)initWithThreadPool:(SThreadPool *)threadPool NS_DESIGNATED_INITIALIZER;
+
 - (void)addTask:(SThreadPoolTask *)task;
-- (SThreadPoolTask *)_popFirstTask;
-- (bool)_hasTasks;
+
+@property(NS_NONATOMIC_IOSONLY, readonly, strong) SThreadPoolTask *_popFirstTask;
+@property(NS_NONATOMIC_IOSONLY, readonly) bool _hasTasks;
 
 @end

@@ -3,9 +3,12 @@
 @interface SBag : NSObject
 
 - (NSInteger)addItem:(id)item;
+
 - (void)enumerateItems:(void (^)(id))block;
+
 - (void)removeItem:(NSInteger)key;
-- (bool)isEmpty;
-- (NSArray *)copyItems;
+
+@property(NS_NONATOMIC_IOSONLY, getter=isEmpty, readonly) bool empty;
+@property(NS_NONATOMIC_IOSONLY, readonly, copy) NSArray *copyItems;
 
 @end

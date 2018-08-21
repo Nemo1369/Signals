@@ -3,7 +3,9 @@
 @interface SSignal (Take)
 
 - (SSignal *)take:(NSUInteger)count;
-- (SSignal *)takeLast;
+
+@property(NS_NONATOMIC_IOSONLY, readonly, strong) SSignal *takeLast;
+
 - (SSignal *)takeUntilReplacement:(SSignal *)replacement;
 
 @end

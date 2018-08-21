@@ -3,7 +3,9 @@
 @interface SSignal (Mapping)
 
 - (SSignal *)map:(id (^)(id))f;
+
 - (SSignal *)filter:(bool (^)(id))f;
-- (SSignal *)ignoreRepeated;
+
+@property(NS_NONATOMIC_IOSONLY, readonly, strong) SSignal *ignoreRepeated;
 
 @end

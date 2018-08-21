@@ -5,11 +5,12 @@
 
 @interface SThreadPool : NSObject
 
-- (instancetype)initWithThreadCount:(NSUInteger)threadCount threadPriority:(double)threadPriority;
+- (instancetype)initWithThreadCount:(NSUInteger)threadCount threadPriority:(double)threadPriority NS_DESIGNATED_INITIALIZER;
 
 - (void)addTask:(SThreadPoolTask *)task;
 
-- (SThreadPoolQueue *)nextQueue;
-- (void)_workOnQueue:(SThreadPoolQueue *)queue block:(void (^)())block;
+@property(NS_NONATOMIC_IOSONLY, readonly, strong) SThreadPoolQueue *nextQueue;
+
+- (void)_workOnQueue:(SThreadPoolQueue *)queue block:(void (^)(void))block;
 
 @end

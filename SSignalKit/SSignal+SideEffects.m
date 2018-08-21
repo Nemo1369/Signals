@@ -5,135 +5,100 @@
 
 @implementation SSignal (SideEffects)
 
-- (SSignal *)onStart:(void (^)())f
-{
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable> (SSubscriber *subscriber)
-    {
+- (SSignal *)onStart:(void (^)(void))f {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
         f();
-        return [self startWithNext:^(id next)
-        {
+        return [self startWithNext:^(id next) {
             [subscriber putNext:next];
-        } error:^(id error)
-        {
+        }                    error:^(id error) {
             [subscriber putError:error];
-        } completed:^
-        {
+        }                completed:^{
             [subscriber putCompletion];
         }];
     }];
 }
 
-- (SSignal *)onNext:(void (^)(id next))f
-{
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable> (SSubscriber *subscriber)
-    {
-        return [self startWithNext:^(id next)
-        {
+- (SSignal *)onNext:(void (^)(id next))f {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
+        return [self startWithNext:^(id next) {
             f(next);
             [subscriber putNext:next];
-        } error:^(id error)
-        {
+        }                    error:^(id error) {
             [subscriber putError:error];
-        } completed:^
-        {
+        }                completed:^{
             [subscriber putCompletion];
         }];
     }];
 }
 
-- (SSignal *)afterNext:(void (^)(id next))f
-{
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable> (SSubscriber *subscriber)
-    {
-        return [self startWithNext:^(id next)
-        {
+- (SSignal *)afterNext:(void (^)(id next))f {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
+        return [self startWithNext:^(id next) {
             [subscriber putNext:next];
             f(next);
-        } error:^(id error)
-        {
+        }                    error:^(id error) {
             [subscriber putError:error];
-        } completed:^
-        {
+        }                completed:^{
             [subscriber putCompletion];
         }];
     }];
 }
 
-- (SSignal *)onError:(void (^)(id error))f
-{
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable> (SSubscriber *subscriber)
-    {
-        return [self startWithNext:^(id next)
-        {
+- (SSignal *)onError:(void (^)(id error))f {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
+        return [self startWithNext:^(id next) {
             [subscriber putNext:next];
-        } error:^(id error)
-        {
+        }                    error:^(id error) {
             f(error);
             [subscriber putError:error];
-        } completed:^
-        {
+        }                completed:^{
             [subscriber putCompletion];
         }];
     }];
 }
 
-- (SSignal *)onCompletion:(void (^)())f
-{
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable> (SSubscriber *subscriber)
-    {
-        return [self startWithNext:^(id next)
-        {
+- (SSignal *)onCompletion:(void (^)(void))f {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
+        return [self startWithNext:^(id next) {
             [subscriber putNext:next];
-        } error:^(id error)
-        {
+        }                    error:^(id error) {
             [subscriber putError:error];
-        } completed:^
-        {
+        }                completed:^{
             f();
             [subscriber putCompletion];
         }];
     }];
 }
 
-- (SSignal *)afterCompletion:(void (^)())f {
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable> (SSubscriber *subscriber)
-    {
-        return [self startWithNext:^(id next)
-        {
+- (SSignal *)afterCompletion:(void (^)(void))f {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
+        return [self startWithNext:^(id next) {
             [subscriber putNext:next];
-        } error:^(id error)
-        {
+        }                    error:^(id error) {
             [subscriber putError:error];
-        } completed:^
-        {
+        }                completed:^{
             [subscriber putCompletion];
             f();
         }];
     }];
 }
 
-- (SSignal *)onDispose:(void (^)())f
-{
-    return [[SSignal alloc] initWithGenerator:^(SSubscriber *subscriber)
-    {
+- (SSignal *)onDispose:(void (^)(void))f {
+    return [[SSignal alloc] initWithGenerator:^(SSubscriber *subscriber) {
         SDisposableSet *compositeDisposable = [[SDisposableSet alloc] init];
-        
-        [compositeDisposable add:[self startWithNext:^(id next)
-        {
+
+        [compositeDisposable add:[self startWithNext:^(id next) {
             [subscriber putNext:next];
-        } error:^(id error)
-        {
+        }                                      error:^(id error) {
             [subscriber putError:error];
-        } completed:^
-        {
+        }                                  completed:^{
             [subscriber putCompletion];
         }]];
-        
-        [compositeDisposable add:[[SBlockDisposable alloc] initWithBlock:^
-        {
+
+        [compositeDisposable add:[[SBlockDisposable alloc] initWithBlock:^{
             f();
         }]];
-        
+
         return compositeDisposable;
     }];
 }

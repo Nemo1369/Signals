@@ -2,6 +2,6 @@
 
 @interface SSignal (Multicast)
 
-- (SSignal *)multicast;
+@property(NS_NONATOMIC_IOSONLY, readonly, strong) SSignal *multicast;
 
 @end

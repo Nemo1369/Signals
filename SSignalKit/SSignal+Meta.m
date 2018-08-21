@@ -8,16 +8,15 @@
 
 #import <libkern/OSAtomic.h>
 
-@interface SSignalQueueState : NSObject <SDisposable>
-{
+@interface SSignalQueueState : NSObject <SDisposable> {
     OSSpinLock _lock;
     bool _executingSignal;
     bool _terminated;
-    
-    id<SDisposable> _disposable;
+
+    id <SDisposable> _disposable;
     SMetaDisposable *_currentDisposable;
     SSubscriber *_subscriber;
-    
+
     NSMutableArray *_queuedSignals;
     bool _queueMode;
     bool _throttleMode;
@@ -27,11 +26,9 @@
 
 @implementation SSignalQueueState
 
-- (instancetype)initWithSubscriber:(SSubscriber *)subscriber queueMode:(bool)queueMode throttleMode:(bool)throttleMode
-{
+- (instancetype)initWithSubscriber:(SSubscriber *)subscriber queueMode:(bool)queueMode throttleMode:(bool)throttleMode {
     self = [super init];
-    if (self != nil)
-    {
+    if (self != nil) {
         _subscriber = subscriber;
         _currentDisposable = [[SMetaDisposable alloc] init];
         _queuedSignals = queueMode ? [[NSMutableArray alloc] init] : nil;
@@ -41,13 +38,11 @@
     return self;
 }
 
-- (void)beginWithDisposable:(id<SDisposable>)disposable
-{
+- (void)beginWithDisposable:(id <SDisposable>)disposable {
     _disposable = disposable;
 }
 
-- (void)enqueueSignal:(SSignal *)signal
-{
+- (void)enqueueSignal:(SSignal *)signal {
     bool startSignal = false;
     OSSpinLockLock(&_lock);
     if (_queueMode && _executingSignal) {
@@ -55,95 +50,78 @@
             [_queuedSignals removeAllObjects];
         }
         [_queuedSignals addObject:signal];
-    }
-    else
-    {
+    } else {
         _executingSignal = true;
         startSignal = true;
     }
     OSSpinLockUnlock(&_lock);
-    
-    if (startSignal)
-    {
+
+    if (startSignal) {
         __weak SSignalQueueState *weakSelf = self;
-        id<SDisposable> disposable = [signal startWithNext:^(id next)
-        {
-            [_subscriber putNext:next];
-        } error:^(id error)
-        {
-            [_subscriber putError:error];
-        } completed:^
-        {
+        id <SDisposable> disposable = [signal startWithNext:^(id next) {
+            [self->_subscriber putNext:next];
+        }                                             error:^(id error) {
+            [self->_subscriber putError:error];
+        }                                         completed:^{
             __strong SSignalQueueState *strongSelf = weakSelf;
             if (strongSelf != nil) {
                 [strongSelf headCompleted];
             }
         }];
-        
-        [_currentDisposable setDisposable:disposable];
+
+        [self->_currentDisposable setDisposable:disposable];
     }
 }
 
-- (void)headCompleted
-{
+- (void)headCompleted {
     SSignal *nextSignal = nil;
-    
+
     bool terminated = false;
     OSSpinLockLock(&_lock);
     _executingSignal = false;
-    
-    if (_queueMode)
-    {
-        if (_queuedSignals.count != 0)
-        {
+
+    if (_queueMode) {
+        if (_queuedSignals.count != 0) {
             nextSignal = _queuedSignals[0];
             [_queuedSignals removeObjectAtIndex:0];
             _executingSignal = true;
-        }
-        else
+        } else
             terminated = _terminated;
-    }
-    else
+    } else
         terminated = _terminated;
     OSSpinLockUnlock(&_lock);
-    
+
     if (terminated)
         [_subscriber putCompletion];
-    else if (nextSignal != nil)
-    {
+    else if (nextSignal != nil) {
         __weak SSignalQueueState *weakSelf = self;
-        id<SDisposable> disposable = [nextSignal startWithNext:^(id next)
-        {
-            [_subscriber putNext:next];
-        } error:^(id error)
-        {
-            [_subscriber putError:error];
-        } completed:^
-        {
+        id <SDisposable> disposable = [nextSignal startWithNext:^(id next) {
+            [self->_subscriber putNext:next];
+        }                                                 error:^(id error) {
+            [self->_subscriber putError:error];
+        }                                             completed:^{
             __strong SSignalQueueState *strongSelf = weakSelf;
             if (strongSelf != nil) {
                 [strongSelf headCompleted];
             }
         }];
-        
-        [_currentDisposable setDisposable:disposable];
+
+        [self->_currentDisposable setDisposable:disposable];
     }
 }
 
-- (void)beginCompletion
-{
+- (void)beginCompletion {
     bool executingSignal = false;
     OSSpinLockLock(&_lock);
     executingSignal = _executingSignal;
     _terminated = true;
     OSSpinLockUnlock(&_lock);
-    
+
     if (!executingSignal)
         [_subscriber putCompletion];
 }
 
-- (void)dispose
-{
+- (void)dispose {
     [_currentDisposable dispose];
     [_disposable dispose];
 }
@@ -152,34 +130,27 @@
 
 @implementation SSignal (Meta)
 
-- (SSignal *)switchToLatest
-{
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable> (SSubscriber *subscriber)
-    {
+- (SSignal *)switchToLatest {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
         SSignalQueueState *state = [[SSignalQueueState alloc] initWithSubscriber:subscriber queueMode:false throttleMode:false];
-        
-        [state beginWithDisposable:[self startWithNext:^(id next)
-        {
+
+        [state beginWithDisposable:[self startWithNext:^(id next) {
             [state enqueueSignal:next];
-        } error:^(id error)
-        {
+        }                                        error:^(id error) {
             [subscriber putError:error];
-        } completed:^
-        {
+        }                                    completed:^{
             [state beginCompletion];
         }]];
-        
+
         return state;
     }];
 }
 
-- (SSignal *)mapToSignal:(SSignal *(^)(id))f
-{
+- (SSignal *)mapToSignal:(SSignal *(^)(id))f {
     return [[self map:f] switchToLatest];
 }
 
-- (SSignal *)mapToQueue:(SSignal *(^)(id))f
-{
+- (SSignal *)mapToQueue:(SSignal *(^)(id))f {
     return [[self map:f] queue];
 }
 
@@ -187,71 +158,55 @@
     return [[self map:f] throttled];
 }
 
-- (SSignal *)then:(SSignal *)signal
-{
-    return [[SSignal alloc] initWithGenerator:^(SSubscriber *subscriber)
-    {
+- (SSignal *)then:(SSignal *)signal {
+    return [[SSignal alloc] initWithGenerator:^(SSubscriber *subscriber) {
         SDisposableSet *compositeDisposable = [[SDisposableSet alloc] init];
-        
+
         SMetaDisposable *currentDisposable = [[SMetaDisposable alloc] init];
         [compositeDisposable add:currentDisposable];
-        
-        [currentDisposable setDisposable:[self startWithNext:^(id next)
-        {
+
+        [currentDisposable setDisposable:[self startWithNext:^(id next) {
             [subscriber putNext:next];
-        } error:^(id error)
-        {
+        }                                              error:^(id error) {
             [subscriber putError:error];
-        } completed:^
-        {
-            [compositeDisposable add:[signal startWithNext:^(id next)
-            {
+        }                                          completed:^{
+            [compositeDisposable add:[signal startWithNext:^(id next) {
                 [subscriber putNext:next];
-            } error:^(id error)
-            {
+            }                                        error:^(id error) {
                 [subscriber putError:error];
-            } completed:^
-            {
+            }                                    completed:^{
                 [subscriber putCompletion];
             }]];
         }]];
-        
+
         return compositeDisposable;
     }];
 }
 
-- (SSignal *)queue
-{
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable> (SSubscriber *subscriber)
-    {
+- (SSignal *)queue {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
         SSignalQueueState *state = [[SSignalQueueState alloc] initWithSubscriber:subscriber queueMode:true throttleMode:false];
-        
-        [state beginWithDisposable:[self startWithNext:^(id next)
-        {
+
+        [state beginWithDisposable:[self startWithNext:^(id next) {
             [state enqueueSignal:next];
-        } error:^(id error)
-        {
+        }                                        error:^(id error) {
             [subscriber putError:error];
-        } completed:^
-        {
+        }                                    completed:^{
             [state beginCompletion];
         }]];
-        
+
         return state;
     }];
 }
 
 - (SSignal *)throttled {
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable>(SSubscriber *subscriber) {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
         SSignalQueueState *state = [[SSignalQueueState alloc] initWithSubscriber:subscriber queueMode:true throttleMode:true];
-        [state beginWithDisposable:[self startWithNext:^(id next)
-        {
+        [state beginWithDisposable:[self startWithNext:^(id next) {
             [state enqueueSignal:next];
-        } error:^(id error)
-        {
+        }                                        error:^(id error) {
             [subscriber putError:error];
-        } completed:^
-        {
+        }                                    completed:^{
             [state beginCompletion];
         }]];
 
@@ -259,18 +214,13 @@
     }];
 }
 
-+ (SSignal *)defer:(SSignal *(^)())generator
-{
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable>(SSubscriber *subscriber)
-    {
-        return [generator() startWithNext:^(id next)
-        {
++ (SSignal *)defer:(SSignal *(^)(void))generator {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
+        return [generator() startWithNext:^(id next) {
             [subscriber putNext:next];
-        } error:^(id error)
-        {
+        }                           error:^(id error) {
             [subscriber putError:error];
-        } completed:^
-        {
+        }                       completed:^{
             [subscriber putCompletion];
         }];
     }];
@@ -280,7 +230,7 @@
 
 @interface SSignalQueue () {
     SPipe *_pipe;
-    id<SDisposable> _disposable;
+    id <SDisposable> _disposable;
 }
 
 @end
@@ -301,9 +251,9 @@
 }
 
 - (SSignal *)enqueue:(SSignal *)signal {
-    return [[SSignal alloc] initWithGenerator:^id<SDisposable>(SSubscriber *subscriber) {
+    return [[SSignal alloc] initWithGenerator:^id <SDisposable>(SSubscriber *subscriber) {
         SPipe *disposePipe = [[SPipe alloc] init];
-        
+
         SSignal *proxy = [[[[signal onNext:^(id next) {
             [subscriber putNext:next];
         }] onError:^(id error) {
@@ -313,9 +263,9 @@
         }] catch:^SSignal *(__unused id error) {
             return [SSignal complete];
         }];
-        
-        _pipe.sink([proxy takeUntilReplacement:disposePipe.signalProducer()]);
-        
+
+        self->_pipe.sink([proxy takeUntilReplacement:disposePipe.signalProducer()]);
+
         return [[SBlockDisposable alloc] initWithBlock:^{
             disposePipe.sink([SSignal complete]);
         }];
